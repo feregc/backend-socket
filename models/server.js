@@ -103,73 +103,74 @@ class Server {
       }
     });
 
-    // Endpoint para aceptar una solicitud de amistad
-    this.app.post("/api/users/accept-friend-request", async (req, res) => {
-      const { userEmail, friendEmail } = req.body;
+// Endpoint para aceptar una solicitud de amistad
+this.app.post("/api/users/accept-friend-request", async (req, res) => {
+  const { solicitudId } = req.body; // Cambio aquí
 
+  try {
+    const solicitud = await SolicitudAmistad.findById(solicitudId)
+      .populate('remitente receptor') // Asegúrate de que los campos de remitente y receptor estén poblados correctamente
+      .exec();
+
+    if (!solicitud || solicitud.estado !== 'pendiente') {
+      return res.status(404).json({ error: 'Solicitud no encontrada o no está pendiente' });
+    }
+
+    solicitud.estado = 'aceptada';
+    await solicitud.save();
+
+    // Actualizar los campos de amigos en ambos usuarios
+    solicitud.remitente.amigos.push(solicitud.receptor);
+    solicitud.receptor.amigos.push(solicitud.remitente);
+
+    await solicitud.remitente.save();
+    await solicitud.receptor.save();
+
+    res.json({ message: 'Solicitud de amistad aceptada' });
+  } catch (error) {
+    console.error('Error al aceptar solicitud de amistad:', error);
+    res.status(500).json({ error: 'Ha ocurrido un error' });
+  }
+});
+
+// Endpoint para rechazar una solicitud de amistad
+this.app.post("/api/users/reject-friend-request", async (req, res) => {
+  const { solicitudId } = req.body; // Cambio aquí
+
+  try {
+
+    if (!solicitud || solicitud.estado !== 'pendiente') {
+      return res.status(404).json({ error: 'Solicitud no encontrada o no está pendiente' });
+    }
+
+    res.json({ message: 'Solicitud de amistad rechazada' });
+  } catch (error) {
+    console.error('Error al rechazar solicitud de amistad:', error);
+    res.status(500).json({ error: 'Ha ocurrido un error' });
+  }
+});
+
+
+    this.app.get('/api/users/friend-requests-received', async (req, res) => {
+      const { userEmail } = req.query;
+  
       try {
-        const usuario = await Usuario.findOne({ email: userEmail });
-        const amigo = await Usuario.findOne({ email: friendEmail });
-
-        if (!usuario || !amigo) {
-          return res
-            .status(404)
-            .json({ error: "Usuario o amigo no encontrado" });
-        }
-
-        // Encontrar la solicitud pendiente correspondiente y actualizar su estado
-        const solicitudPendiente = await SolicitudAmistad.findOneAndUpdate(
-          { remitente: amigo._id, receptor: usuario._id, estado: "pendiente" },
-          { estado: "aceptada" }
-        );
-
-        if (!solicitudPendiente) {
-          return res
-            .status(404)
-            .json({ error: "Solicitud pendiente no encontrada" });
-        }
-
-        // Actualizar los campos de amigos en ambos usuarios
-        usuario.amigos.push(amigo._id);
-        amigo.amigos.push(usuario._id);
-
-        await usuario.save();
-        await amigo.save();
-
-        res.json({ message: "Solicitud de amistad aceptada" });
+          const usuario = await Usuario.findOne({ email: userEmail });
+  
+          if (!usuario) {
+              return res.status(404).json({ error: 'Usuario no encontrado' });
+          }
+  
+          const solicitudesRecibidas = await SolicitudAmistad.find({ receptor: usuario._id, estado: 'pendiente' })
+              .populate('remitente', 'nombre')
+              .exec();
+  
+          res.json(solicitudesRecibidas);
       } catch (error) {
-        console.error("Error al aceptar solicitud de amistad:", error);
-        res.status(500).json({ error: "Ha ocurrido un error" });
+          console.error('Error fetching friend requests:', error);
+          res.status(500).json({ error: 'Ha ocurrido un error' });
       }
-    });
-
-    // Endpoint para rechazar una solicitud de amistad
-    this.app.post("/api/users/reject-friend-request", async (req, res) => {
-      const { userEmail, friendEmail } = req.body;
-
-      try {
-        const usuario = await Usuario.findOne({ email: userEmail });
-        const amigo = await Usuario.findOne({ email: friendEmail });
-
-        if (!usuario || !amigo) {
-          return res
-            .status(404)
-            .json({ error: "Usuario o amigo no encontrado" });
-        }
-
-        // Encontrar y eliminar la solicitud pendiente
-        await SolicitudAmistad.findOneAndDelete({
-          remitente: amigo._id,
-          receptor: usuario._id,
-          estado: "pendiente",
-        });
-
-        res.json({ message: "Solicitud de amistad rechazada" });
-      } catch (error) {
-        console.error("Error al rechazar solicitud de amistad:", error);
-        res.status(500).json({ error: "Ha ocurrido un error" });
-      }
-    });
+  });
 
   }
 
