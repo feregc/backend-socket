@@ -7,7 +7,7 @@ require('dotenv').config();
 
 // Inicializar la instancia del server
 const server = new Server();
-
+const httpServer = server.server; // Obtener el objeto del servidor HTTP
 // Ejecutar el server
 server.execute();
 
