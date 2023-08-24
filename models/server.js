@@ -135,19 +135,26 @@ this.app.post("/api/users/accept-friend-request", async (req, res) => {
 
 // Endpoint para rechazar una solicitud de amistad
 this.app.post("/api/users/reject-friend-request", async (req, res) => {
-  const { solicitudId } = req.body; // Cambio aquí
+    const { solicitudId } = req.body; // Cambio aquí
 
-  try {
+    try {
+      const solicitud = await SolicitudAmistad.findById(solicitudId)
+        .populate('remitente receptor') // Asegúrate de que los campos de remitente y receptor estén poblados correctamente
+        .exec();
+  
+      if (!solicitud || solicitud.estado !== 'pendiente') {
+        return res.status(404).json({ error: 'Solicitud no encontrada o no está pendiente' });
+      }
+  
+      solicitud.estado = 'rechazada';
+      await solicitud.save();
 
-    if (!solicitud || solicitud.estado !== 'pendiente') {
-      return res.status(404).json({ error: 'Solicitud no encontrada o no está pendiente' });
+  
+      res.json({ message: 'Solicitud de amistad rechazado' });
+    } catch (error) {
+      console.error('Error al rechazar solicitud de amistad:', error);
+      res.status(500).json({ error: 'Ha ocurrido un error' });
     }
-
-    res.json({ message: 'Solicitud de amistad rechazada' });
-  } catch (error) {
-    console.error('Error al rechazar solicitud de amistad:', error);
-    res.status(500).json({ error: 'Ha ocurrido un error' });
-  }
 });
 
 
